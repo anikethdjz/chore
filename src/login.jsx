@@ -1,50 +1,37 @@
 import React, { useState } from 'react';
-import { Mail, Lock, BookOpen } from 'lucide-react';
+import { Mail, Lock } from 'lucide-react';
 
 /**
  * Props:
- * - userType: current selected type ('client' | 'solver' | null)
- * - setUserType(type) : set the selected user type
- * - onLogin({ email, password, userType }) : called when the user submits login
- * - onSwitchToSignup() : called when user wants to go to signup
- * - onBackToHome() : optional - back to landing
+ * - onLogin(user) : called when the user submits login (receives full user object)
+ * - onClose(): optional
+ *
+ * NOTE: For demo this component logs users in as 'solver' by default.
+ * Login now accepts optional profile fields: stream and sem (semester 1..8).
+ * If provided, they are included in the returned user object so the app can persist them.
  */
-export default function Login({ userType, setUserType, onLogin, onSwitchToSignup, onClose }) {
+export default function Login({ onLogin, onClose }) {
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+  const [stream, setStream] = useState(''); // optional
+  const [sem, setSem] = useState(''); // optional: '1'..'8'
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!userType) {
-      alert('Please select client or solver');
-      return;
-    }
-    // Simulate login (in real app, call backend)
+    // Demo: create a user and treat them as solver by default.
     const user = {
       id: `user-${Date.now()}`,
-      name: loginForm.email.split('@')[0],
+      name: (loginForm.email && loginForm.email.split('@')[0]) || 'User',
       email: loginForm.email,
-      type: userType
+      type: 'solver', // default role
+      isClientUpgradeAvailable: true,
+      stream: stream || undefined,
+      sem: sem ? Number(sem) : undefined,
     };
-    onLogin(user);
+    if (typeof onLogin === 'function') onLogin(user);
   };
 
   return (
     <>
-      <div className="flex gap-2 mb-6">
-        <button
-          onClick={() => setUserType('client')}
-          className={`flex-1 py-2 rounded-lg font-medium transition-all ${ userType === 'client' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-        >
-          👨‍💼 Client
-        </button>
-        <button
-          onClick={() => setUserType('solver')}
-          className={`flex-1 py-2 rounded-lg font-medium transition-all ${ userType === 'solver' ? 'bg-purple-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-        >
-          🔧 Solver
-        </button>
-      </div>
-
       <form onSubmit={handleSubmit}>
         <div className="space-y-4">
           <div>
@@ -77,6 +64,45 @@ export default function Login({ userType, setUserType, onLogin, onSwitchToSignup
             </div>
           </div>
 
+          {/* Optional profile completion fields */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Stream (optional)</label>
+              <select
+                value={stream}
+                onChange={(e) => setStream(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white"
+              >
+                <option value="">Choose stream</option>
+                <option value="cse">CSE</option>
+                <option value="ece">ECE</option>
+                <option value="eee">EEE</option>
+                <option value="civil">CIVIL</option>
+                <option value="mech">MECH</option>
+                <option value="other">OTHER</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Semester (optional)</label>
+              <select
+                value={sem}
+                onChange={(e) => setSem(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white"
+              >
+                <option value="">Choose sem</option>
+                <option value="1">Sem 1</option>
+                <option value="2">Sem 2</option>
+                <option value="3">Sem 3</option>
+                <option value="4">Sem 4</option>
+                <option value="5">Sem 5</option>
+                <option value="6">Sem 6</option>
+                <option value="7">Sem 7</option>
+                <option value="8">Sem 8</option>
+              </select>
+            </div>
+          </div>
+
           <button
             type="submit"
             className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:shadow-lg transition-all"
@@ -85,6 +111,10 @@ export default function Login({ userType, setUserType, onLogin, onSwitchToSignup
           </button>
         </div>
       </form>
+
+      <div className="mt-4 text-sm text-gray-600 text-center">
+        By default you will be logged in as a <strong>solver</strong>. You can optionally fill stream & sem now to complete your profile.
+      </div>
     </>
   );
 }

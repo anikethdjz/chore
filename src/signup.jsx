@@ -1,62 +1,53 @@
 import React, { useState } from 'react';
-import { User, Mail, Phone, Lock, BookOpen } from 'lucide-react';
+import { User, Mail, Phone, Lock } from 'lucide-react';
 
 /**
  * Props:
- * - defaultType: 'client' | 'solver' (optional)
- * - onSignup(formData) : called when the user submits signup
- * - onSwitchToLogin() : called when the user wants to go to login
- * - onBackToHome() : optional - back to landing
+ * - onSignup(user) : called when the user submits signup (receives user object)
+ * - onClose(): optional
+ *
+ * Behavior:
+ * - No explicit role switch. Default account type is 'solver'.
+ * - A checkbox "Enable posting (become client)" allows creating a client at signup.
+ * - Added fields: stream (select) and sem (select 1..8)
  */
-export default function Signup({ defaultType = 'client', onSignup, onSwitchToLogin, onClose }) {
+export default function Signup({ onSignup, onClose }) {
   const [form, setForm] = useState({
     name: '',
     email: '',
     phone: '',
     password: '',
-    type: defaultType
   });
+
+  // If checked, user will be created as client (can post immediately)
+  const [enablePosting, setEnablePosting] = useState(false);
+
+  // profile fields
+  const [stream, setStream] = useState('');
+  const [sem, setSem] = useState(''); // string '1'..'8'
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.name.trim() || !form.email.trim() || !form.password.trim()) {
-      alert('Please fill all fields');
+      alert('Please fill all required fields');
       return;
     }
-    // Create user object
     const user = {
       id: `user-${Date.now()}`,
       name: form.name,
       email: form.email,
       phone: form.phone,
-      type: form.type
+      type: enablePosting ? 'client' : 'solver',
+      isClientUpgradeAvailable: enablePosting ? false : true,
+      stream: stream || undefined,
+      sem: sem ? Number(sem) : undefined,
     };
-    onSignup(user);
+    if (typeof onSignup === 'function') onSignup(user);
   };
 
   return (
     <>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Account Type</label>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setForm({ ...form, type: 'client' })}
-            className={`flex-1 py-2 rounded-lg font-medium transition-all ${ form.type === 'client' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-          >
-            👨‍💼 Client
-          </button>
-          <button
-            type="button"
-            onClick={() => setForm({ ...form, type: 'solver' })}
-            className={`flex-1 py-2 rounded-lg font-medium transition-all ${ form.type === 'solver' ? 'bg-purple-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-          >
-            🔧 Solver
-          </button>
-        </div>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
           <div className="relative">
@@ -88,7 +79,7 @@ export default function Signup({ defaultType = 'client', onSignup, onSwitchToLog
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Phone (optional)</label>
           <div className="relative">
             <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
@@ -116,6 +107,58 @@ export default function Signup({ defaultType = 'client', onSignup, onSwitchToLog
           </div>
         </div>
 
+        {/* New profile fields: stream + sem */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Stream</label>
+            <select
+              value={stream}
+              onChange={(e) => setStream(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white"
+            >
+              <option value="">Choose stream</option>
+              <option value="cse">CSE</option>
+              <option value="ece">ECE</option>
+              <option value="eee">EEE</option>
+              <option value="civil">CIVIL</option>
+              <option value="mech">MECH</option>
+              <option value="other">OTHER</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Semester</label>
+            <select
+              value={sem}
+              onChange={(e) => setSem(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white"
+            >
+              <option value="">Choose sem</option>
+              <option value="1">Sem 1</option>
+              <option value="2">Sem 2</option>
+              <option value="3">Sem 3</option>
+              <option value="4">Sem 4</option>
+              <option value="5">Sem 5</option>
+              <option value="6">Sem 6</option>
+              <option value="7">Sem 7</option>
+              <option value="8">Sem 8</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <input
+            id="enablePosting"
+            type="checkbox"
+            checked={enablePosting}
+            onChange={(e) => setEnablePosting(e.target.checked)}
+            className="h-4 w-4"
+          />
+          <label htmlFor="enablePosting" className="text-sm text-gray-700">
+            Enable posting (become client)
+          </label>
+        </div>
+
         <button
           type="submit"
           className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:shadow-lg transition-all"
@@ -123,6 +166,10 @@ export default function Signup({ defaultType = 'client', onSignup, onSwitchToLog
           Create Account
         </button>
       </form>
+
+      <div className="mt-4 text-sm text-gray-600 text-center">
+        By default you will be a <strong>solver</strong>. You can enable posting if you want to create assignments now.
+      </div>
     </>
   );
 }

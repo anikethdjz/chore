@@ -1,11 +1,9 @@
 // chore.jsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import AssignmentCard from './assignmentcard';
 import Login from './login';
 import Signup from './signup';
-import LandingPage from './landing';
-
-
+import LandingPage from './landingpage';
 
 export default function Chore() {
   const [assignments, setAssignments] = useState([]);
@@ -13,16 +11,18 @@ export default function Chore() {
   const [appliedAssignments, setAppliedAssignments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
-  const [userType, setUserType] = useState(null);
   const [error, setError] = useState(null);
 
   // UI modal state
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showSignupModal, setShowSignupModal] = useState(false);
   const [showPostModal, setShowPostModal] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+  // NEW: filter & sort state
+  const [filters, setFilters] = useState({ stream: 'all', sortBy: 'deadline' });
 
   useEffect(() => {
-    // try restore user from localStorage
     try {
       const raw = localStorage.getItem('user');
       if (raw) setUser(JSON.parse(raw));
@@ -59,7 +59,9 @@ export default function Chore() {
           title: 'CS Assignment - Linked Lists',
           description: 'Implement singly and doubly linked lists, with tests.',
           subject: 'Data Structures',
+          stream: 'cse',
           deadline: '2025-12-20',
+          postedAt: '2025-11-28',
           preferredSolver: '3rd year CS',
           postedBy: 'Riya',
           applicants: [],
@@ -69,7 +71,9 @@ export default function Chore() {
           title: 'Math Assignment - Integrals',
           description: 'Solve integrals and write LaTeX steps.',
           subject: 'Calculus',
+          stream: 'eee',
           deadline: '2025-12-25',
+          postedAt: '2025-11-30',
           preferredSolver: 'Any',
           postedBy: 'Arjun',
           applicants: [],
@@ -120,7 +124,6 @@ export default function Chore() {
     }
     if (appliedAssignments.includes(assignmentId)) return;
 
-    // optimistic update
     setAppliedAssignments((p) => [...p, assignmentId]);
 
     try {
@@ -133,12 +136,10 @@ export default function Chore() {
         setAppliedAssignments((p) => p.filter((id) => id !== assignmentId));
         throw new Error('apply failed');
       }
-      // update local assignments' applicants list
       setAssignments((prev) =>
         prev.map((a) => {
           if (a.id === assignmentId) {
             const newApplicants = a.applicants ? [...a.applicants] : [];
-            // avoid duplicate applicant entries
             if (!newApplicants.find((ap) => ap.id === user.id)) {
               newApplicants.push({ id: user.id, name: user.name, skills: '', rating: 0 });
             }
@@ -185,9 +186,18 @@ export default function Chore() {
   // Called by Login/Signup components when auth succeeds
   function handleAuthSuccess(u) {
     if (!u) return;
-    setUser(u);
+    const normalized = {
+      ...u,
+      // default to solver if missing
+      type: u.type || 'solver',
+      isClientUpgradeAvailable: u.type !== 'client',
+      // preserve stream & sem from u if provided
+      stream: u.stream || u.stream === '' ? u.stream : undefined,
+      sem: u.sem || u.sem === 0 ? u.sem : undefined,
+    };
+    setUser(normalized);
     try {
-      localStorage.setItem('user', JSON.stringify(u));
+      localStorage.setItem('user', JSON.stringify(normalized));
     } catch (e) {
       console.warn('localStorage set failed', e);
     }
@@ -204,78 +214,50 @@ export default function Chore() {
     setUser(null);
   }
 
-  // If user is not logged in, show landing page with login/signup prompts
-  if (!user) {
-    return (
-      <>
-        <LandingPage
-          onGetStarted={() => setShowLoginModal(true)}
-          onViewAssignments={() => setShowSignupModal(true)}
-        />
-
-        {/* Login Modal */}
-        {showLoginModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold text-gray-900">Login</h3>
-                <button className="text-gray-400 hover:text-gray-600 text-2xl" onClick={() => setShowLoginModal(false)}>
-                  ✕
-                </button>
-              </div>
-              <Login userType={userType} setUserType={setUserType} onLogin={handleAuthSuccess} onClose={() => setShowLoginModal(false)} />
-              <div className="mt-6 text-center text-sm text-gray-600">
-                Don't have an account?{' '}
-                <button
-                  className="text-blue-600 font-medium hover:underline"
-                  onClick={() => {
-                    setShowLoginModal(false);
-                    setShowSignupModal(true);
-                  }}
-                >
-                  Sign up
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Signup Modal */}
-        {showSignupModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold text-gray-900">Sign up</h3>
-                <button className="text-gray-400 hover:text-gray-600 text-2xl" onClick={() => setShowSignupModal(false)}>
-                  ✕
-                </button>
-              </div>
-              <Signup defaultType="client" onSignup={handleAuthSuccess} onClose={() => setShowSignupModal(false)} />
-              <div className="mt-6 text-center text-sm text-gray-600">
-                Already have an account?{' '}
-                <button
-                  className="text-blue-600 font-medium hover:underline"
-                  onClick={() => {
-                    setShowSignupModal(false);
-                    setShowLoginModal(true);
-                  }}
-                >
-                  Login
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </>
-    );
+  // ---- Posting / upgrade flow ----
+  async function upgradeUserToClient() {
+    if (!user) return;
+    try {
+      await new Promise((res) => setTimeout(res, 600));
+      const updated = { ...user, type: 'client', isClientUpgradeAvailable: false };
+      setUser(updated);
+      try {
+        localStorage.setItem('user', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('localStorage set failed', e);
+      }
+      setShowUpgradeModal(false);
+      setShowPostModal(true);
+      alert('Account upgraded to client. You can now post assignments.');
+    } catch (e) {
+      console.error(e);
+      alert('Upgrade failed. Try again.');
+    }
   }
 
-  // Post new assignment via a small inline form modal (instead of prompts)
+  function handleRequestPost() {
+    if (!user) {
+      setShowLoginModal(true);
+      return;
+    }
+    if (user.type === 'client') {
+      setShowPostModal(true);
+      return;
+    }
+    if (user.isClientUpgradeAvailable) {
+      setShowUpgradeModal(true);
+    } else {
+      alert('Posting not available for your account.');
+    }
+  }
+
+  // Post new assignment via a small inline form modal
   function PostAssignmentModal({ onClose }) {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [subject, setSubject] = useState('');
     const [deadline, setDeadline] = useState('');
+    const [stream, setStream] = useState('');
 
     async function submit() {
       if (!title.trim()) return alert('Title required');
@@ -284,20 +266,19 @@ export default function Chore() {
         title,
         description,
         subject: subject || 'General',
+        stream: stream || 'all',
         deadline,
+        postedAt: new Date().toISOString().slice(0, 10),
         preferredSolver: '',
         postedBy: user?.name || 'anonymous',
+        postedByUserId: user?.id,
         applicants: [],
       };
 
-      // optimistic local update
       setAssignments((p) => [newAssignment, ...p]);
       setUserAssignments((p) => [newAssignment, ...p]);
-
-      // close modal
       onClose();
 
-      // attempt to POST to backend if available
       try {
         const res = await fetch('/api/assignments', {
           method: 'POST',
@@ -344,6 +325,15 @@ export default function Chore() {
               />
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Stream (optional)</label>
+              <input
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 bg-white text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                placeholder="e.g., cse, eee, ece"
+                value={stream}
+                onChange={(e) => setStream(e.target.value)}
+              />
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Deadline</label>
               <input
                 className="w-full border border-gray-300 rounded-lg px-4 py-2 bg-white text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
@@ -360,6 +350,35 @@ export default function Chore() {
                 Post Assignment
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function UpgradeToClientModal({ onClose }) {
+    return (
+      <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg">
+          <div className="flex justify-between items-start mb-4">
+            <h3 className="text-2xl font-bold text-gray-900">Upgrade to Post Assignments</h3>
+            <button className="text-gray-400 hover:text-gray-600 text-2xl" onClick={onClose}>
+              ✕
+            </button>
+          </div>
+
+          <p className="text-gray-700 mb-6">
+            Your account is currently a <strong>solver</strong>. To post assignments you need a client account.
+            Upgrading will let you post assignments and review applicants. (This demo simulates the upgrade.)
+          </p>
+
+          <div className="flex gap-3 justify-end pt-4 border-t border-gray-100">
+            <button className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700" onClick={onClose}>
+              Cancel
+            </button>
+            <button className="px-4 py-2 rounded-lg bg-gradient-to-r from-green-500 to-green-600 text-white" onClick={upgradeUserToClient}>
+              Confirm & Upgrade
+            </button>
           </div>
         </div>
       </div>
@@ -409,6 +428,112 @@ export default function Chore() {
     );
   }
 
+  const streams = useMemo(() => {
+    const set = new Set();
+    for (const a of assignments) {
+      if (a.stream) set.add(a.stream);
+    }
+    return ['all', ...Array.from(set)];
+  }, [assignments]);
+
+  const visible = useMemo(() => {
+    const filtered = assignments.filter((a) => {
+      if (!a) return false;
+      const streamMatch = filters.stream === 'all' || (a.stream && a.stream === filters.stream);
+      return streamMatch;
+    });
+
+    const sorted = filtered.slice().sort((x, y) => {
+      const parseDate = (d) => {
+        if (!d) return 0;
+        const t = Date.parse(d);
+        return Number.isNaN(t) ? 0 : t;
+      };
+
+      if (filters.sortBy === 'deadline') {
+        return parseDate(x.deadline) - parseDate(y.deadline);
+      }
+
+      if (filters.sortBy === 'posted') {
+        return parseDate(y.postedAt) - parseDate(x.postedAt);
+      }
+
+      if (filters.sortBy === 'subject') {
+        const ax = (x.subject || '').toLowerCase();
+        const ay = (y.subject || '').toLowerCase();
+        if (ax < ay) return -1;
+        if (ax > ay) return 1;
+        return 0;
+      }
+
+      return 0;
+    });
+
+    return sorted;
+  }, [assignments, filters]);
+
+  if (!user) {
+    return (
+      <>
+        <LandingPage onGetStarted={() => setShowLoginModal(true)} onViewAssignments={() => setShowSignupModal(true)} />
+
+        {/* Login Modal */}
+        {showLoginModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-gray-900">Login</h3>
+                <button className="text-gray-400 hover:text-gray-600 text-2xl" onClick={() => setShowLoginModal(false)}>
+                  ✕
+                </button>
+              </div>
+              <Login onLogin={handleAuthSuccess} onClose={() => setShowLoginModal(false)} />
+              <div className="mt-6 text-center text-sm text-gray-600">
+                Don't have an account?{' '}
+                <button
+                  className="text-blue-600 font-medium hover:underline"
+                  onClick={() => {
+                    setShowLoginModal(false);
+                    setShowSignupModal(true);
+                  }}
+                >
+                  Sign up
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Signup Modal */}
+        {showSignupModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-gray-900">Sign up</h3>
+                <button className="text-gray-400 hover:text-gray-600 text-2xl" onClick={() => setShowSignupModal(false)}>
+                  ✕
+                </button> 
+              </div>
+              <Signup onSignup={handleAuthSuccess} onClose={() => setShowSignupModal(false)} />
+              <div className="mt-6 text-center text-sm text-gray-600">
+                Already have an account?{' '}
+                <button
+                  className="text-blue-600 font-medium hover:underline"
+                  onClick={() => {
+                    setShowSignupModal(false);
+                    setShowLoginModal(true);
+                  }}
+                >
+                  Login
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <div className="max-w-6xl mx-auto py-8 px-4">
@@ -417,25 +542,71 @@ export default function Chore() {
         {error && <div className="mb-4 p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg">{error}</div>}
 
         <section className="mb-12">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-3xl font-bold text-gray-900 mb-1">Browse Assignments</h2>
               <p className="text-gray-600">Find and solve assignments from students</p>
             </div>
-            {user && user.type === 'client' && (
-              <button className="px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg font-semibold hover:shadow-lg transition" onClick={() => setShowPostModal(true)}>
-                + Post Assignment
+
+            <div className="flex items-center gap-3">
+              {(user && user.type === 'client') || (user && user.isClientUpgradeAvailable) ? (
+                <button
+                  className="px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg font-semibold hover:shadow-lg transition"
+                  onClick={handleRequestPost}
+                >
+                  + Post Assignment
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-gray-600 mr-2">Stream</label>
+              <select
+                value={filters.stream}
+                onChange={(e) => setFilters((p) => ({ ...p, stream: e.target.value }))}
+                className="px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              >
+                {streams.map((s) => (
+                  <option key={s} value={s}>
+                    {s === 'all' ? 'All streams' : s.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+
+              <label className="text-sm text-gray-600 ml-4 mr-2">Sort by</label>
+              <select
+                value={filters.sortBy}
+                onChange={(e) => setFilters((p) => ({ ...p, sortBy: e.target.value }))}
+                className="px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              >
+                <option value="deadline">Deadline (earliest)</option>
+                <option value="posted">Posted (newest)</option>
+                <option value="subject">Subject (A → Z)</option>
+              </select>
+
+              <button
+                className="ml-4 px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm"
+                onClick={() => setFilters({ stream: 'all', sortBy: 'deadline' })}
+                title="Clear filters"
+              >
+                Clear
               </button>
-            )}
+            </div>
+
+            <div className="text-sm text-gray-600">
+              Showing <span className="font-medium text-gray-900">{visible.length}</span> of <span className="font-medium text-gray-900">{assignments.length}</span> assignments
+            </div>
           </div>
 
           {loading ? (
             <div className="text-center py-12"><div className="text-gray-600 font-medium">Loading assignments...</div></div>
-          ) : assignments.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-2xl shadow-sm"><div className="text-gray-600">No assignments yet. Be the first to post one!</div></div>
+          ) : visible.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-2xl shadow-sm"><div className="text-gray-600">No assignments match the selected filters.</div></div>
           ) : (
-            <div className="grid gap-6">
-              {assignments.map((a) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {visible.map((a) => (
                 <AssignmentCard
                   key={a.id}
                   assignment={a}
@@ -475,8 +646,9 @@ export default function Chore() {
         )}
       </div>
 
-      {/* Post Assignment Modal */}
       {showPostModal && user && user.type === 'client' && <PostAssignmentModal onClose={() => setShowPostModal(false)} />}
+
+      {showUpgradeModal && <UpgradeToClientModal onClose={() => setShowUpgradeModal(false)} />}
     </div>
   );
 }

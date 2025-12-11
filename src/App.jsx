@@ -1,6 +1,6 @@
 import './App.css'
 import { useState } from 'react';
-import LandingPage from './home.jsx';
+import LandingPage from './landingpage.jsx';
 import AssignmentMarketplace from './chore.jsx';
 
 function App() {
